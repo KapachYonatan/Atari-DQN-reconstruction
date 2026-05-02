@@ -22,12 +22,20 @@ class Config:
     # ------------------------------------------------------------------ #
     # Replay buffer                                                        #
     # ------------------------------------------------------------------ #
-    buffer_capacity: int = 1_000_000
-    """Maximum number of transitions stored.  States are kept as uint8 to
-    limit RAM usage (~6.7 GB for 1 M × 4 × 84 × 84 frames)."""
+    buffer_capacity: int = 150_000
+    """Maximum number of transitions stored.
 
-    min_replay_size: int = 50_000
-    """Training updates start only after this many transitions are stored."""
+    Colab-safe default to avoid system RAM exhaustion with the current replay
+    layout (state + next_state). Increase to 1,000,000 only when enough host
+    RAM is available.
+    """
+
+    min_replay_size: int = 20_000
+    """Training updates start only after this many transitions are stored.
+
+    Keep this proportional to ``buffer_capacity`` when tuning on limited-RAM
+    environments.
+    """
 
     # ------------------------------------------------------------------ #
     # Training                                                             #
