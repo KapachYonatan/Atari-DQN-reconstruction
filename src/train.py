@@ -25,7 +25,7 @@ from src.config import Config
 from src.env import make_env
 from src.evaluate import evaluate
 from src.replay_buffer import ReplayBuffer
-from src.utils import set_seeds
+from src.utils import load_checkpoint, set_seeds
 
 
 def train(config: Config) -> list[float]:
@@ -60,24 +60,54 @@ def train(config: Config) -> list[float]:
     )
 
     # ------------------------------------------------------------------ #
+    # Resume                                                               #
+    # ------------------------------------------------------------------ #
+    start_step = 0
+    best_mean_reward = float("-inf")
+    if config.resume_from:
+        ckpt = load_checkpoint(os.path.join(config.resume_from, "checkpoint_latest.pt"))
+        agent.online_net.load_state_dict(ckpt["model_state_dict"])
+        agent.target_net.load_state_dict(ckpt["target_state_dict"])
+        ckpt_cfg = ckpt.get("config")
+        if ckpt_cfg is not None and ckpt_cfg.optimizer != config.optimizer:
+            config.optimizer = ckpt_cfg.optimizer
+            agent._optimizer = agent._build_optimizer()
+        agent._optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        start_step = int(ckpt["step"])
+        best_mean_reward = float(ckpt.get("best_mean_reward", float("-inf")))
+        buf_path = os.path.join(config.resume_from, "buffer_latest.npz")
+        if os.path.exists(buf_path):
+                try:
+                    buffer.load(buf_path)
+                except Exception as exc:
+                    print(
+                        f"[train] failed to load replay buffer from {buf_path}: {exc}. "
+                        "Continuing with an empty buffer."
+                    )
+        else:
+            print(f"[train] no buffer file found at {buf_path} — buffer will refill from scratch")
+        print(f"[train] resumed from step {start_step:,}  buffer_size={len(buffer):,}")
+
+    # ------------------------------------------------------------------ #
     # CSV logging                                                          #
     # ------------------------------------------------------------------ #
-    csv_file = open(metrics_path, "w", newline="")
+    csv_mode = "a" if start_step > 0 else "w"
+    csv_file = open(metrics_path, csv_mode, newline="")
     writer = csv.writer(csv_file)
-    writer.writerow(["step", "mean_eval_reward", "max_eval_reward", "n_eval_episodes"])
+    if start_step == 0:
+        writer.writerow(["step", "mean_eval_reward", "max_eval_reward", "n_eval_episodes"])
 
     # ------------------------------------------------------------------ #
     # Training loop                                                        #
     # ------------------------------------------------------------------ #
     mean_eval_rewards: list[float] = []
-    best_mean_reward = float("-inf")
 
     obs, _ = env.reset(seed=config.seed)
     episode_reward = 0.0
     episode_count = 0
     t_start = time.time()
 
-    for step in range(1, config.total_steps + 1):
+    for step in range(start_step + 1, config.total_steps + 1):
         # ---- Epsilon schedule ---------------------------------------- #
         fraction = min(step / config.epsilon_decay_steps, 1.0)
         epsilon = config.epsilon_start + fraction * (
@@ -129,11 +159,11 @@ def train(config: Config) -> list[float]:
             # Save best checkpoint
             if mean_r > best_mean_reward:
                 best_mean_reward = mean_r
-                _save_checkpoint(agent, config, step, epsilon, run_dir, tag="best")
+                _save_checkpoint(agent, config, step, epsilon, best_mean_reward, run_dir, tag="best")
 
         # ---- Periodic checkpoint ------------------------------------- #
         if step % config.save_frequency == 0:
-            _save_checkpoint(agent, config, step, epsilon, run_dir, tag="latest")
+            _save_checkpoint(agent, config, step, epsilon, best_mean_reward, run_dir, tag="latest", buffer=buffer)
 
     env.close()
     csv_file.close()
@@ -151,15 +181,18 @@ def _save_checkpoint(
     config: Config,
     step: int,
     epsilon: float,
+    best_mean_reward: float,
     run_dir: str,
     tag: str,
+    buffer: ReplayBuffer | None = None,
 ) -> None:
-    """Save online net, target net, and optimizer state."""
+    """Save online net, target net, optimizer state, and optionally the replay buffer."""
     path = os.path.join(run_dir, f"checkpoint_{tag}.pt")
     torch.save(
         {
             "step": step,
             "epsilon": epsilon,
+            "best_mean_reward": best_mean_reward,
             "model_state_dict": agent.online_net.state_dict(),
             "target_state_dict": agent.target_net.state_dict(),
             "optimizer_state_dict": agent._optimizer.state_dict(),
@@ -167,3 +200,5 @@ def _save_checkpoint(
         },
         path,
     )
+    if buffer is not None:
+        buffer.save(os.path.join(run_dir, "buffer_latest.npz"))

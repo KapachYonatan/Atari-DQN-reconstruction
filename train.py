@@ -31,6 +31,8 @@ def _parse_args() -> Config:
     parser.add_argument("--min-replay-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--results-dir", type=str, default="results")
+    parser.add_argument("--resume", type=str, default="",
+                        help="Path to a run directory to resume from (e.g. results/run1).")
 
     args = parser.parse_args()
 
@@ -45,6 +47,8 @@ def _parse_args() -> Config:
         cfg.min_replay_size = args.min_replay_size
     if args.lr is not None:
         cfg.lr = args.lr
+    if args.resume:
+        cfg.resume_from = args.resume
 
     return cfg
 

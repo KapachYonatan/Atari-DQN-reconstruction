@@ -98,6 +98,67 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return self._size
 
+    def save(self, path: str) -> None:
+        """Save the live portion of the buffer to a compressed npz file.
+
+        Only the filled slice (``[:self._size]``) is saved to keep file size small.
+
+        Args:
+            path: Destination ``.npz`` file path.
+        """
+        np.savez_compressed(
+            path,
+            states=self._states[: self._size],
+            next_states=self._next_states[: self._size],
+            actions=self._actions[: self._size],
+            rewards=self._rewards[: self._size],
+            dones=self._dones[: self._size],
+            ptr=np.array([self._ptr]),
+            size=np.array([self._size]),
+        )
+
+    def load(self, path: str) -> None:
+        """Restore buffer state from a file written by :meth:`save`.
+
+        Args:
+            path: Path to the ``.npz`` file.
+        """
+        data = np.load(path)
+
+        required = ["states", "next_states", "actions", "rewards", "dones"]
+        missing = [name for name in required if name not in data.files]
+        if missing:
+            raise ValueError(
+                f"Replay buffer archive is missing required arrays: {missing}. "
+                f"Found keys: {list(data.files)}"
+            )
+
+        loaded_states = data["states"]
+        loaded_next_states = data["next_states"]
+        loaded_actions = data["actions"]
+        loaded_rewards = data["rewards"]
+        loaded_dones = data["dones"]
+
+        if "size" in data.files:
+            loaded_size = int(data["size"][0])
+        else:
+            # Backward-compatibility with older archives without metadata.
+            loaded_size = int(loaded_states.shape[0])
+
+        size = min(loaded_size, self._capacity)
+        self._size = size
+
+        if "ptr" in data.files:
+            self._ptr = int(data["ptr"][0]) % self._capacity
+        else:
+            self._ptr = size % self._capacity
+
+        self._states[:size] = loaded_states[:size]
+        self._next_states[:size] = loaded_next_states[:size]
+        self._actions[:size] = loaded_actions[:size]
+        self._rewards[:size] = loaded_rewards[:size]
+        self._dones[:size] = loaded_dones[:size]
+
     @property
     def is_ready(self) -> bool:
         """True once enough transitions exist to start training (checked externally)."""

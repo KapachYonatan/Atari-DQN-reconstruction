@@ -64,4 +64,4 @@ def load_checkpoint(path: str) -> dict:
         Dictionary with keys: step, epsilon, model_state_dict,
         target_state_dict, optimizer_state_dict, config.
     """
-    return torch.load(path, map_location="cpu")
+    return torch.load(path, map_location="cpu", weights_only=False)

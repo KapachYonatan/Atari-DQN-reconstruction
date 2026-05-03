@@ -95,10 +95,18 @@ class Config:
     results_dir: str = "results"
     """Root directory for per-run subdirectories."""
 
-    save_frequency: int = 100_000
+    save_frequency: int = 50_000
     """Save a checkpoint every this many training steps."""
 
     # ------------------------------------------------------------------ #
     # Reproducibility                                                      #
     # ------------------------------------------------------------------ #
     seed: int = 42
+
+    # ------------------------------------------------------------------ #
+    # Resume                                                               #
+    # ------------------------------------------------------------------ #
+    resume_from: str = ""
+    """Path to a previous run directory to resume from (e.g. 'results/run1').
+    Empty string means a fresh run.
+    Expects checkpoint_latest.pt and buffer_latest.npz inside that directory."""
