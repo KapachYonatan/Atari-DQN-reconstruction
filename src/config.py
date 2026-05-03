@@ -67,6 +67,21 @@ class Config:
     grad_clip: float | None = None
     """If set, clip gradient norms to this value before each optimizer step."""
 
+    reward_mode: str = "clip"
+    """How to scale training rewards. Options:
+    - 'clip'      : clip to {-1, 0, +1} (DQN paper default).
+    - 'normalize' : clip(r / reward_max_abs, 1).
+                    Dense rewards stay meaningful (100 → 0.25, 400 → 1.0);
+                    rare large bonuses saturate at ±1 instead of exploding.
+    - 'none'      : pass raw game rewards unchanged (requires retuning lr).
+    """
+
+    reward_max_abs: float = 400.0
+    """Divisor used when ``reward_mode='normalize'``.
+    For Crazy Climber: Building 4 awards 400 pts/row — the highest dense reward.
+    Using 400 maps the most common rewards to (0, 1] and caps spikes at 1.
+    """
+
     # ------------------------------------------------------------------ #
     # Exploration                                                          #
     # ------------------------------------------------------------------ #
@@ -84,7 +99,7 @@ class Config:
     eval_frequency: int = 10_000
     """Run an evaluation episode every this many training steps."""
 
-    eval_episodes: int = 10
+    eval_episodes: int = 100
     """Number of episodes per evaluation checkpoint.
     Use 30+ for final 3 submitted runs; document this in the report."""
 
