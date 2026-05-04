@@ -14,6 +14,7 @@ Usage (from the project root):
 from __future__ import annotations
 
 import csv
+import dataclasses
 import os
 import time
 
@@ -69,9 +70,22 @@ def train(config: Config) -> list[float]:
         agent.online_net.load_state_dict(ckpt["model_state_dict"])
         agent.target_net.load_state_dict(ckpt["target_state_dict"])
         ckpt_cfg = ckpt.get("config")
-        if ckpt_cfg is not None and ckpt_cfg.optimizer != config.optimizer:
-            config.optimizer = ckpt_cfg.optimizer
+        if ckpt_cfg is not None:
+            # Merge: fill any fields added to Config after this checkpoint was saved.
+            defaults = Config()
+            for f in dataclasses.fields(Config):
+                if not hasattr(ckpt_cfg, f.name):
+                    setattr(ckpt_cfg, f.name, getattr(defaults, f.name))
+                    print(f"[train] resume: missing field '{f.name}' filled with default {getattr(defaults, f.name)!r}")
+            # Keep session-identity fields from the CLI config.
+            ckpt_cfg.run_id = config.run_id
+            ckpt_cfg.results_dir = config.results_dir
+            ckpt_cfg.resume_from = config.resume_from
+            config = ckpt_cfg
+            agent._config = config
             agent._optimizer = agent._build_optimizer()
+        else:
+            print("[train] resume: no config found in checkpoint — using CLI config as-is")
         agent._optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         start_step = int(ckpt["step"])
         best_mean_reward = float(ckpt.get("best_mean_reward", float("-inf")))
@@ -87,6 +101,8 @@ def train(config: Config) -> list[float]:
         else:
             print(f"[train] no buffer file found at {buf_path} — buffer will refill from scratch")
         print(f"[train] resumed from step {start_step:,}  buffer_size={len(buffer):,}")
+
+    _print_config(config)
 
     # ------------------------------------------------------------------ #
     # CSV logging                                                          #
@@ -202,3 +218,10 @@ def _save_checkpoint(
     )
     if buffer is not None:
         buffer.save(os.path.join(run_dir, "buffer_latest.npz"))
+
+
+def _print_config(config: Config) -> None:
+    """Print all config fields as a readable table."""
+    print("[train] effective config:")
+    for key, val in dataclasses.asdict(config).items():
+        print(f"  {key:<25} {val}")

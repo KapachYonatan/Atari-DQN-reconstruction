@@ -99,7 +99,7 @@ class Config:
     eval_frequency: int = 10_000
     """Run an evaluation episode every this many training steps."""
 
-    eval_episodes: int = 100
+    eval_episodes: int = 30
     """Number of episodes per evaluation checkpoint.
     Use 30+ for final 3 submitted runs; document this in the report."""
 
