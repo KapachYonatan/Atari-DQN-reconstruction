@@ -14,7 +14,11 @@ class Config:
     # ------------------------------------------------------------------ #
     env_id: str = "ALE/CrazyClimber-v5"
     """Gymnasium environment ID.  Must be a NoFrameskip variant so that
-    AtariPreprocessing can apply its own frame-skip internally."""
+    AtariPreprocessing can apply its own frame-skip internally.
+
+    Use ``ALE/CrazyClimber-v5`` with ``repeat_action_probability=0.0`` to
+    replicate NoFrameskip-v4 behaviour (no sticky actions) as required by
+    the course assignment."""
 
     n_stack: int = 4
     """Number of consecutive frames to stack into a single observation."""

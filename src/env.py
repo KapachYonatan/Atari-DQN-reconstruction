@@ -83,7 +83,9 @@ def make_env(config: Config, *, eval_mode: bool = False) -> gym.Env:
 
     # frameskip=1 disables the env's built-in frame-skip so that
     # AtariPreprocessing can apply its own (frame_skip=4) without conflict.
-    env = gym.make(config.env_id, frameskip=1)
+    # repeat_action_probability=0.0 disables sticky actions, matching the
+    # NoFrameskip-v4 / DQN-paper evaluation setting required by the course.
+    env = gym.make(config.env_id, frameskip=1, repeat_action_probability=0.0)
 
     # Paper preprocessing: noop reset, frame-skip=4, max-pool, grayscale, 84×84.
     # scale_obs=False keeps observations as uint8 (we normalise in the buffer).

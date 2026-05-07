@@ -26,7 +26,7 @@ from src.config import Config
 from src.env import make_env
 from src.evaluate import evaluate
 from src.replay_buffer import ReplayBuffer
-from src.utils import load_checkpoint, set_seeds
+from src.utils import load_checkpoint, plot_learning_curve, set_seeds
 
 
 def train(config: Config) -> list[float]:
@@ -183,6 +183,12 @@ def train(config: Config) -> list[float]:
 
     env.close()
     csv_file.close()
+
+    plot_path = os.path.join(run_dir, "learning_curve.png")
+    try:
+        plot_learning_curve(metrics_path, plot_path)
+    except Exception as exc:
+        print(f"[plot] failed to generate training curve: {exc}")
 
     print(f"[train] done  best_mean_eval={best_mean_reward:.1f}")
     return mean_eval_rewards
